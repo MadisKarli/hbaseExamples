@@ -3,7 +3,7 @@
 <configuration>
     <property>
         <name>hbase.zookeeper.quorum</name>
-        <value>localhost</value>
+        <value>ir-hadoop1</value>
         <!--<value>192.168.99.100</value>-->
     </property>
 </configuration>

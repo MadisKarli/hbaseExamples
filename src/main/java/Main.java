@@ -7,15 +7,18 @@ import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.spark.JavaHBaseContext;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.io.Text;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function;
 import scala.Tuple2;
 import util.GetFunction;
 import util.PutFunction;
+import util.PutFunctionRDD;
 import util.ResultFunction;
 
 import java.io.IOException;
@@ -25,6 +28,8 @@ import java.util.List;
 
 /**
  * Created by Madis-Karli Koppel on 27/12/2017.
+ * TODO Specify schema before?
+ * TODO check hash funcition if needed
  */
 public class Main {
 
@@ -43,27 +48,39 @@ public class Main {
 
     public static void main(String[] args) throws IOException {
 
-        tableName = "Test5";
+        tableName = "koppel_test2";
         hConf = HBaseConfiguration.create();
         connection = ConnectionFactory.createConnection(hConf);
         table = connection.getTable(TableName.valueOf(tableName));
 
-        createJava();
+        // createJava();
 
-        insertJava();
+        // insertJava();
 
-        getJava(5);
+        // getJava(5);
 
-        deleteJava("2");
+        // deleteJava("2");
 
-        getJava(5);
+        // getJava(5);
 
         startSpark();
 
-        List<String> values = new ArrayList<String>();
-        values.add("1,name,First,Igor,name,Last,Smigor,id,personal,123");
+        JavaPairRDD<Text, Text> input = jsc.sequenceFile(args[0], Text.class, Text.class);
 
-        insertSpark(values);
+        // Map the folder into javaRDD
+        JavaRDD<Tuple2<String, String>> in2 = input.map(new Function<Tuple2<Text, Text>, Tuple2<String, String>>() {
+            @Override
+            public Tuple2<String, String> call(Tuple2<Text, Text> t) {
+                return new Tuple2<String, String>(t._1.toString(), t._2.toString());
+            }
+        });
+
+        insertSpark(in2);
+
+        List<String> values = new ArrayList<String>();
+        values.add("123,raw,id,neti.ee,raw,data,text from neti.ee");
+
+        // insertSpark(values);
 
         getSparkRegular();
 
@@ -75,6 +92,9 @@ public class Main {
         connection.close();
     }
 
+    /*
+     * Create a table into hbase using only Java
+     */
     private static void createJava() throws IOException {
 
         Admin admin = connection.getAdmin();
@@ -93,6 +113,9 @@ public class Main {
         }
     }
 
+    /*
+     * Insert into an Hbase table using Spark
+     */
     private static void insertSpark(List<String> values) {
 
         logger.info("Inserting into " + tableName + " values " + values);
@@ -108,6 +131,26 @@ public class Main {
                 new PutFunction());
     }
 
+    /*
+     * Insert into an Hbase table using Spark
+     */
+    private static void insertSpark(JavaRDD<Tuple2<String, String>> values) {
+
+        logger.info("Inserting into " + tableName + " values " + values);
+
+        JavaHBaseContext hbaseContext = new JavaHBaseContext(jsc, hConf);
+
+        logger.info("connected to hbase");
+
+        hbaseContext.bulkPut(
+                values,
+                TableName.valueOf(tableName),
+                new PutFunctionRDD());
+    }
+
+    /*
+     * Insert into an Hbase table using only Java
+     */
     private static void insertJava() throws IOException {
         logger.info("inserting into table " + tableName);
         String[][] people = {
@@ -129,6 +172,9 @@ public class Main {
         logger.info("Inserted into " + tableName + " values " + Arrays.asList(people));
     }
 
+    /*
+     * Fetch number of rows from Hbase table using only Java
+     */
     private static void getJava(int numberOfRows) throws IOException {
 
         logger.info("Fetching " + String.valueOf(numberOfRows) + " rows from table " + tableName);
@@ -151,6 +197,9 @@ public class Main {
         }
     }
 
+    /*
+     * Fetch all rows from Hbase table using Spark and Scan
+     */
     private static void getSparkRegular() throws IOException {
 
         JavaHBaseContext hbaseContext = new JavaHBaseContext(jsc, hConf);
@@ -169,9 +218,12 @@ public class Main {
             }
         });
 
-        logger.error("Regular get result" + result.collect().toString());
+        logger.error("Regular get result " + result.collect().toString());
     }
 
+    /*
+     * Fetch number rows from Hbase table using Spark and bulkget
+     */
     private static void getSparkStreaming(int numberOfRows) {
 
         logger.info("Fetching " + String.valueOf(numberOfRows) + " rows from table " + tableName);
@@ -191,6 +243,9 @@ public class Main {
         logger.info("Streaming get result " + result.collect().toString());
     }
 
+    /*
+     * Delete values from Hbase table using only Java
+     */
     private static void deleteJava(String rowId) throws IOException {
         Delete delete = new Delete(Bytes.toBytes(rowId));
         table.delete(delete);
