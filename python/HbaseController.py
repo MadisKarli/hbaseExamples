@@ -1,5 +1,5 @@
 import happybase
-
+import hashlib
 
 class HbaseController:
     """
@@ -27,7 +27,21 @@ class HbaseController:
 
     def insert_batch(self, row):
         #TODO think of a better soluition for ID
-        self.batch.put(str(hash(row[0])), {x: row[index] for index, x in enumerate(self.schema)})
+        self.batch.put(hashlib.sha1(str(row[0])).hexdigest(), {x: row[index] for index, x in enumerate(self.schema)})
+
+
+    def insert_batch_dict(self, dict):
+        out = {}
+        for key in dict:
+            out["raw:" + key] = str(dict[key])
+        # TODO think of a better soluition for ID
+        hsh = hashlib.sha1(str(dict)).hexdigest()
+        self.batch.put(hsh, out)
 
     def insert_batch_custom(self, row):
         self.batch_put(row)
+
+    def stop(self):
+        # Send last batch
+        self.batch.send()
+        self.conn.close()
