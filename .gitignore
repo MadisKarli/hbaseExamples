@@ -1,0 +1,7 @@
+python/data
+.idea
+python/.idea
+*.pyc
+python/venv
+target
+hbase.iml
